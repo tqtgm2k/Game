@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Bắn Súng 2D Đơn Giản</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-image: url(bg.jpg);
+            background-size: cover;
+            background-position: center;
+        }
+
+        canvas {
+            display: block;
+        }
+
+  .controls {
+    display: flex;
+  }
+  .button {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: black;
+    border: none;
+    padding: 50px 50px;
+    margin: 50px 50px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+  }
+  .fire-button {
+    position: absolute;
+    bottom: 20px;
+    right: 0;
+    background-color: rgba(255, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 40px 60px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+  }
+  .score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-size: 20px;
+    user-select: none;
+  }
+  .lives {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: white;
+    font-size: 20px;
+  }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 30px;
+            text-align: center;
+            display: none;
+        }
+
+        .restart-button {
+            background-color: rgba(255, 255, 255, 0.5);
+            color: black;
+            border: none;
+            padding: 15px 30px;
+            margin-top: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <button class="button" id="leftBtn">Trái</button>
+        <button class="button" id="rightBtn">Phải</button>
+    </div>
+    <button class="fire-button" id="fireBtn">Bắn</button>
+    <div class="score" id="score">Điểm: 0</div>
+    <div class="lives" id="lives">Mạng: 3</div>
+    <div class="game-over" id="gameOverScreen">
+        Game Over!
+        <button class="restart-button" id="restartBtn">Chơi Lại</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const restartBtn = document.getElementById('restartBtn');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Đường dẫn đến ảnh của người chơi
+        const playerImageSrc = 'player.png'; // Thay 'player.png' bằng đường dẫn thực tế
+        const playerImage = new Image();
+        playerImage.src = playerImageSrc;
+
+        // Kích thước hiển thị của người chơi
+        const playerWidth = 50;
+        const playerHeight = 50;
+
+        const player = {
+            x: canvas.width / 2 - playerWidth / 2,
+            y: canvas.height - playerHeight - 20,
+            width: playerWidth,
+            height: playerHeight,
+            speed: 5,
+        };
+
+        const bullets = [];
+        const bulletSpeed = 10;
+        const bulletRadius = 5;
+        const bulletColor = 'white';
+
+        const enemies = [];
+        const enemySpeed = 2;
+        const enemySize = 30;
+        const enemyColor = 'purple';
+        const enemySpawnInterval = 60;
+        let enemySpawnCounter = 0;
+
+        const healthPacks = [];
+        const healthPackSize = 40;
+        const healthPackColor = 'lime';
+        const healthPackSpawnInterval = 300;
+        let healthPackSpawnCounter = 0;
+
+        const healthPackImageSrc = 'health.png'; // Thay 'health.png' bằng đường dẫn thực tế
+        const healthPackImage = new Image();
+        healthPackImage.src = healthPackImageSrc;
+
+        const particles = [];
+
+        let score = 0;
+        let lives = 3;
+        let gameActive = true;
+
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const fireBtn = document.getElementById('fireBtn');
+
+        let moveLeft = false;
+        let moveRight = false;
+
+        leftBtn.addEventListener('touchstart', (e) => {
+            moveLeft = true;
+            e.preventDefault();
+        });
+        leftBtn.addEventListener('touchend', () => {
+            moveLeft = false;
+        });
+        leftBtn.addEventListener('mousedown', () => {
+            moveLeft = true;
+        });
+        leftBtn.addEventListener('mouseup', () => {
+            moveLeft = false;
+        });
+        leftBtn.addEventListener('mouseout', () => {
+            moveLeft = false;
+        });
+
+        rightBtn.addEventListener('touchstart', (e) => {
+            moveRight = true;
+            e.preventDefault();
+        });
+        rightBtn.addEventListener('touchend', () => {
+            moveRight = false;
+        });
+        rightBtn.addEventListener('mousedown', () => {
+            moveRight = true;
+        });
+        rightBtn.addEventListener('mouseup', () => {
+            moveRight = false;
+        });
+        rightBtn.addEventListener('mouseout', () => {
+            moveRight = false;
+        });
+
+        fireBtn.addEventListener('touchstart', (e) => {
+            if (gameActive && playerImage.complete && healthPackImage.complete) {
+                shoot();
+            }
+            e.preventDefault();
+        });
+        fireBtn.addEventListener('mousedown', () => {
+            if (gameActive && playerImage.complete && healthPackImage.complete) {
+                shoot();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (gameActive && playerImage.complete && healthPackImage.complete) {
+                if (e.key === 'ArrowLeft' || e.key === 'a') {
+                    moveLeft = true;
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd') {
+                    moveRight = true;
+                }
+                if (e.key === ' ') {
+                    shoot();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                moveLeft = false;
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd') {
+                moveRight = false;
+            }
+        });
+
+        restartBtn.addEventListener('click', () => {
+            resetGame();
+        });
+
+        function shoot() {
+            const bulletX = player.x + player.width / 2;
+            const bulletY = player.y;
+            bullets.push({
+                x: bulletX,
+                y: bulletY,
+                radius: bulletRadius,
+                color: bulletColor
+            });
+        }
+
+        function createEnemy() {
+            const enemyX = Math.random() * (canvas.width - enemySize);
+            const enemyY = -enemySize;
+            enemies.push({
+                x: enemyX,
+                y: enemyY,
+                width: enemySize,
+                height: enemySize,
+                color: enemyColor
+            });
+        }
+
+        function createHealthPack() {
+            const healthPackX = Math.random() * (canvas.width - healthPackSize);
+            const healthPackY = -healthPackSize;
+            healthPacks.push({
+                x: healthPackX,
+                y: healthPackY,
+                size: healthPackSize,
+                color: healthPackColor
+            });
+        }
+
+        function createEnemyParticles(x, y) {
+            const particleCount = Math.floor(Math.random() * 3) + 3;
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    radius: Math.random() * 4,
+                    color: `rgba(255, ${Math.random() * 100}, 0, 1)`, // Màu đỏ
+                    velocity: {
+                        x: (Math.random() - 0.5) * 3,
+                        y: (Math.random() - 0.5) * 3
+                    },
+                    alpha: 1,
+                    fade: 0.03
+                });
+            }
+        }
+
+        function createHealthParticles(x, y) {
+            const particleCount = 7; // Nhiều hạt hơn cho hiệu ứng máu
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    radius: Math.random() * 6,
+                    color: 'lime', // Màu xanh lá cây
+                    velocity: {
+                        x: (Math.random() - 0.5) * 5, // Vận tốc nhanh hơn
+                        y: (Math.random() - 0.5) * 5
+                    },
+                    alpha: 1,
+                    fade: 0.02
+                });
+            }
+        }
+
+        function drawPlayer() {
+            if (playerImage.complete) {
+                ctx.drawImage(
+                    playerImage,
+                    player.x,
+                    player.y,
+                    player.width,
+                    player.height
+                );
+            }
+        }
+
+        function drawBullet(bullet) {
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+            ctx.fillStyle = bullet.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawEnemy(enemy) {
+            ctx.fillStyle = enemy.color;
+            ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+        }
+
+        function drawHealthPack(healthPack) {
+            if (healthPackImage.complete) {
+                ctx.drawImage(
+                    healthPackImage,
+                    healthPack.x,
+                    healthPack.y,
+                    healthPack.size,
+                    healthPack.size
+                );
+            }
+        }
+
+        function drawParticle(particle) {
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+            ctx.fillStyle = particle.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function checkCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = `Điểm: ${score}`;
+        }
+
+        function updateLives() {
+            livesDisplay.textContent = `Mạng: ${lives}`;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            gameOverScreen.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameActive = true;
+            gameOverScreen.style.display = 'none';
+            score = 0;
+            lives = 3;
+            bullets.length = 0;
+            enemies.length = 0;
+            healthPacks.length = 0;
+            particles.length = 0;
+            player.x = canvas.width / 2 - playerWidth / 2;
+            player.y = canvas.height - playerHeight - 20;
+            updateScore();
+            updateLives();
+            update();
+        }
+
+        function update() {
+            if (!gameActive) {
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Di chuyển người chơi
+            if (moveLeft) {
+                player.x -= player.speed;
+            }
+            if (moveRight) {
+                player.x += player.speed;
+            }
+
+            // Giới hạn vị trí người chơi
+            if (player.x < 0) {
+                player.x = 0;
+            }
+            if (player.x > canvas.width - player.width) {
+                player.x = canvas.width - player.width;
+            }
+
+            drawPlayer();
+
+            // Tạo địch ngẫu nhiên
+            enemySpawnCounter++;
+            if (enemySpawnCounter >= enemySpawnInterval) {
+                createEnemy();
+                enemySpawnCounter = 0;
+            }
+
+            // Di chuyển địch
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                enemy.y += enemySpeed;
+                drawEnemy(enemy);
+
+                // Kiểm tra va chạm giữa địch và người chơi
+                const playerRect = {
+                    x: player.x,
+                    y: player.y,
+                    width: player.width,
+                    height: player.height
+                };
+                const enemyRect = {
+                    x: enemy.x,
+                    y: enemy.y,
+                    width: enemy.width,
+                    height: enemy.height
+                };
+                if (checkCollision(playerRect, enemyRect)) {
+                    console.log("Player hit by enemy!");
+                    lives--;
+                    updateLives();
+                    enemies.splice(i, 1);
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    continue;
+                }
+
+                // Kiểm tra nếu địch chạm vào biên giới dưới
+                if (enemy.y > canvas.height) {
+                    lives--;
+                    updateLives();
+                    enemies.splice(i, 1);
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    continue;
+                }
+            }
+
+            // Tạo item máu ngẫu nhiên
+            healthPackSpawnCounter++;
+            if (healthPackSpawnCounter >= healthPackSpawnInterval) {
+                createHealthPack();
+                healthPackSpawnCounter = 0;
+            }
+
+            // Di chuyển và vẽ item máu
+            for (let i = healthPacks.length - 1; i >= 0; i--) {
+                const healthPack = healthPacks[i];
+                healthPack.y += enemySpeed / 2;
+                drawHealthPack(healthPack);
+
+                // Kiểm tra va chạm giữa đạn và item máu
+                const healthPackRect = {
+                    x: healthPack.x,
+                    y: healthPack.y,
+                    width: healthPack.size,
+                    height: healthPack.size
+                };
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const bullet = bullets[j];
+                    const bulletRect = {
+                        x: bullet.x - bullet.radius,
+                        y: bullet.y - bullet.radius,
+                        width: bullet.radius * 2,
+                        height: bullet.radius * 2
+                    };
+                    if (checkCollision(bulletRect, healthPackRect)) {
+                        createHealthParticles(healthPack.x + healthPack.size / 2, healthPack.y + healthPack.size / 2);
+                        bullets.splice(j, 1);
+                        healthPacks.splice(i, 1);
+                        lives++;
+                        updateLives();
+                        break;
+                    }
+                }
+
+                // Xóa item máu khi ra khỏi màn hình
+                if (healthPack.y > canvas.height) {
+                    healthPacks.splice(i, 1);
+                }
+            }
+
+            // Di chuyển đạn và kiểm tra va chạm với địch
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.y -= bulletSpeed;
+                drawBullet(bullet);
+
+                // Kiểm tra va chạm với địch
+                const bulletRect = {
+                    x: bullet.x - bullet.radius,
+                    y: bullet.y - bullet.radius,
+                    width: bullet.radius * 2,
+                    height: bullet.radius * 2
+                };
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    const enemyRect = {
+                        x: enemy.x,
+                        y: enemy.y,
+                        width: enemy.width,
+                        height: enemy.height
+                    };
+                    if (checkCollision(bulletRect, enemyRect)) {
+                        createEnemyParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+                        bullets.splice(i, 1);
+                        enemies.splice(j, 1);
+                        score++;
+                        updateScore();
+                        break;
+                    }
+                }
+
+                // Xóa đạn khi ra khỏi màn hình
+                if (bullet.y < 0) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Cập nhật và vẽ các hạt máu
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                if (particle.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                particle.x += particle.velocity.x;
+                particle.y += particle.velocity.y;
+                particle.alpha -= particle.fade;
+                drawParticle(particle);
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        updateScore();
+        updateLives();
+        // Đảm bảo cả hai ảnh đều đã tải xong trước khi bắt đầu trò chơi
+        Promise.all([
+            new Promise(resolve => playerImage.onload = resolve),
+            new Promise(resolve => healthPackImage.onload = resolve)
+        ]).then(() => {
+            update();
+        });
+    </script>
+</body>
+
+</html>
